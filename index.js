@@ -6,18 +6,28 @@ AWS.config.update({ region: "us-west-2" });
 const s3 = new AWS.S3();
 
 const source = fs.readFileSync("./email.txt");
-const amexRegex = /(?<=Card).+?(?=Was)/;
 
 const amex = $ => {
-  const text = $("b").text();
-  const matches = text.match(amexRegex);
-  if (matches && matches.length === 1) {
-    const text = matches[0];
-    return text;
+  const words = [];
+  let startIndex = null;
+
+  $("b").each(function(i, elem) {
+    const text = $(this).text();
+    if (text.indexOf("your Card") > -1) {
+      startIndex = i + 1;
+    }
+    words[i] = text;
+  });
+
+  if (startIndex !== null) {
+    return [words[startIndex], words[startIndex + 1].replace("*", "")].join(
+      " "
+    );
   } else {
     return null;
   }
 };
+let $ = null;
 
 const main = async message => {
   const { html } = await simpleParser(source);
