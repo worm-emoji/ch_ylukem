@@ -2,10 +2,16 @@ const simpleParser = require("mailparser").simpleParser;
 const cheerio = require("cheerio");
 const fs = require("fs");
 const AWS = require("aws-sdk");
+const Twitter = require("twitter");
 AWS.config.update({ region: "us-west-2" });
 const s3 = new AWS.S3();
 
-const source = fs.readFileSync("./email.txt");
+const twitter = new Twitter({
+  consumer_key: process.env.TWITTER_CONSUMER_KEY,
+  consumer_secret: process.env.TWITTER_CONSUMER_SECRET,
+  access_token_key: process.env.TWITTER_ACCESS_TOKEN_KEY,
+  access_token_secret: process.env.TWITTER_ACCESS_TOKEN_SECRET
+});
 
 const amex = $ => {
   const words = [];
@@ -20,26 +26,52 @@ const amex = $ => {
   });
 
   if (startIndex !== null) {
-    return [words[startIndex], words[startIndex + 1].replace("*", "")].join(
-      " "
-    );
+    const merchant = words[startIndex];
+    const amount = words[startIndex + 1].replace("*", "");
+    return `${merchant} — ${amount}`;
   } else {
     return null;
   }
 };
-let $ = null;
+
+const citibank = $ => {
+  const merchant = $("td")
+    .filter((i, el) => $(el).text() === "Merchant")
+    .next()
+    .text();
+
+  const amount = $("span")
+    .filter((i, el) => $(el).text() === "Amount:")
+    .closest("tr")
+    .text()
+    .replace("Amount:", "")
+    .trim();
+  return `${merchant} — ${amount}`;
+};
 
 const main = async message => {
-  const { html } = await simpleParser(source);
+  console.log("Main getting called");
+  const { html } = await simpleParser(message);
   $ = cheerio.load(html);
   let response = null;
   if (html.indexOf("American Express") > -1) {
+    console.log("American Express");
     response = amex($);
+  } else if (html.indexOf("Citibank") > -1) {
+    console.log("Citibank");
+    response = citibank($);
+  } else {
+    console.log("Couldn't determine bank");
   }
-  console.log(response);
+  console.log("Response", response);
+  if (response !== null) {
+    twitter.post("statuses/update", { status: response }, (err, data) => {
+      if (err) {
+        console.err(err);
+      }
+    });
+  }
 };
-
-main(source);
 
 exports.handler = async event => {
   const messageId = event["Records"][0].ses.mail.messageId;
@@ -48,11 +80,15 @@ exports.handler = async event => {
     Key: messageId
   };
 
-  s3.getObject(params, function(err, data) {
+  console.log("Message ID", messageId);
+
+  s3.getObject(params, async function(err, data) {
     if (err) {
       console.log(err, err.stack);
     } else {
-      main(data.Body);
+      await main(data.Body);
     }
   });
+
+  return "";
 };

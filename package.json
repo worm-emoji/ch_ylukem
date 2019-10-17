@@ -8,6 +8,7 @@
   "dependencies": {
     "aws-sdk": "^2.550.0",
     "cheerio": "^1.0.0-rc.3",
-    "mailparser": "^2.7.1"
+    "mailparser": "^2.7.1",
+    "twitter": "^1.7.1"
   }
 }
