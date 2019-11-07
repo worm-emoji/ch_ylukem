@@ -65,6 +65,27 @@ const square = ($, subject) => {
   return `${merchant} — ${amount}`;
 };
 
+const chase = html => {
+  let merchant = null;
+
+  const regex = /(A charge of)(.+)(at)(.+) (has)/;
+  const results = regex.exec(html);
+
+  if (results.length == 6) {
+    // we remove USD so that way non US currencies will render the type
+    const amount = results[2]
+      .replace(" (", "")
+      .replace(") ", "")
+      .replace(/USD/, "")
+      .trim();
+    merchant = results[4].trim();
+    return `${merchant} — ${amount}`;
+  } else {
+    console.log("Regex didn't match");
+    return null;
+  }
+};
+
 const main = async message => {
   console.log("Main getting called");
   const { html, subject } = await simpleParser(message);
@@ -79,6 +100,9 @@ const main = async message => {
   } else if (html.indexOf("Square") > -1) {
     console.log("Square");
     response = square($, subject);
+  } else if (html.indexOf("Transaction Alert from Chase") > -1) {
+    console.log("Chase");
+    response = chase(html);
   } else {
     console.log("Couldn't determine bank");
   }
