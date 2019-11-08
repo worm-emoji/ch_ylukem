@@ -65,11 +65,11 @@ const square = ($, subject) => {
   return `${merchant} — ${amount}`;
 };
 
-const chase = html => {
+const chase = text => {
   let merchant = null;
 
   const regex = /(A charge of)(.+)(at)(.+) (has)/;
-  const results = regex.exec(html);
+  const results = regex.exec(text);
 
   if (results.length == 6) {
     // we remove USD so that way non US currencies will render the type
@@ -88,24 +88,30 @@ const chase = html => {
 
 const main = async message => {
   console.log("Main getting called");
-  const { html, subject } = await simpleParser(message);
+  const { html, subject, text } = await simpleParser(message);
   $ = cheerio.load(html);
   let response = null;
-  if (html.indexOf("American Express") > -1) {
-    console.log("American Express");
-    response = amex($);
-  } else if (html.indexOf("Citibank") > -1) {
-    console.log("Citibank");
-    response = citibank($);
-  } else if (html.indexOf("Square") > -1) {
-    console.log("Square");
-    response = square($, subject);
-  } else if (html.indexOf("Transaction Alert from Chase") > -1) {
+
+  if (subject.indexOf("Transaction Alert from Chase") > -1) {
     console.log("Chase");
-    response = chase(html);
+    response = chase(text);
+  } else if (html !== false) {
+    if (html.indexOf("American Express") > -1) {
+      console.log("American Express");
+      response = amex($);
+    } else if (html.indexOf("Citibank") > -1) {
+      console.log("Citibank");
+      response = citibank($);
+    } else if (html.indexOf("Square") > -1) {
+      console.log("Square");
+      response = square($, subject);
+    } else {
+      console.log("Couldn't determine bank");
+    }
   } else {
-    console.log("Couldn't determine bank");
+    console.log("Couldn't find HTML in email. Can't parse.");
   }
+
   console.log("Response", response);
   if (response !== null) {
     return new Promise(resolve => {
