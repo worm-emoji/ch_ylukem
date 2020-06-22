@@ -1,6 +1,5 @@
 const simpleParser = require("mailparser").simpleParser;
 const cheerio = require("cheerio");
-const fs = require("fs");
 const AWS = require("aws-sdk");
 const Twitter = require("twitter");
 AWS.config.update({ region: "us-west-2" });
@@ -12,14 +11,14 @@ const twitter = new Twitter({
   consumer_key: process.env.TWITTER_CONSUMER_KEY,
   consumer_secret: process.env.TWITTER_CONSUMER_SECRET,
   access_token_key: process.env.TWITTER_ACCESS_TOKEN_KEY,
-  access_token_secret: process.env.TWITTER_ACCESS_TOKEN_SECRET
+  access_token_secret: process.env.TWITTER_ACCESS_TOKEN_SECRET,
 });
 
-const amex = jq => {
+const amex = (jq) => {
   const words = [];
   let startIndex = null;
 
-  jq("b").each(function(i, elem) {
+  jq("b").each(function (i, elem) {
     const text = jq(this).text();
     if (text.indexOf("your Card") > -1) {
       startIndex = i + 1;
@@ -36,18 +35,21 @@ const amex = jq => {
   }
 };
 
-const citibank = jq => {
+const citibank = (jq) => {
   const merchant = jq("td")
-    .filter((i, el) => jq(el).text() === "Merchant")
-    .next()
-    .text();
-
-  const amount = jq("span")
-    .filter((i, el) => jq(el).text() === "Amount:")
-    .closest("tr")
+    .filter((i, el) => jq(el).text().startsWith("Merchant"))
+    .closest("table")
+    .closest("td")
+    .next("td")
     .text()
-    .replace("Amount:", "")
     .trim();
+
+  const amount = jq("td")
+    .filter((i, el) => jq(el).text().startsWith("Amount:"))
+    .text()
+    .replace("Amount: ", "")
+    .trim();
+
   return `${merchant} — ${amount}`;
 };
 
@@ -65,7 +67,7 @@ const square = ($, subject) => {
   return `${merchant} — ${amount}`;
 };
 
-const chase = text => {
+const chase = (text) => {
   let merchant = null;
 
   const regex = /(A charge of)(.+)(at)(.+) (has)/;
@@ -86,8 +88,7 @@ const chase = text => {
   }
 };
 
-const main = async message => {
-  console.log("Main getting called");
+const main = async (message) => {
   const { html, subject, text } = await simpleParser(message);
   $ = cheerio.load(html);
   let response = null;
@@ -114,7 +115,7 @@ const main = async message => {
 
   console.log("Response", response);
   if (response !== null) {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       twitter.post("statuses/update", { status: response }, (err, data) => {
         if (err) {
           console.error(err);
@@ -126,16 +127,16 @@ const main = async message => {
   return response;
 };
 
-exports.handler = async event => {
+exports.handler = async (event) => {
   const messageId = event["Records"][0].ses.mail.messageId;
   const params = {
     Bucket: "transaction-emails",
-    Key: messageId
+    Key: messageId,
   };
 
   console.log("Message ID", messageId);
-  return new Promise(resolve => {
-    s3.getObject(params, async function(err, data) {
+  return new Promise((resolve) => {
+    s3.getObject(params, async function (err, data) {
       if (err) {
         console.log(err, err.stack);
       } else {
