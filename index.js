@@ -4,7 +4,6 @@ const AWS = require("aws-sdk");
 const Twitter = require("twitter");
 AWS.config.update({ region: "us-west-2" });
 const s3 = new AWS.S3();
-
 let $ = null;
 
 const twitter = new Twitter({
@@ -44,7 +43,7 @@ const citibank = (jq) => {
     .text()
     .trim();
 
-  const amount = jq("td")
+  const amount = jq("span")
     .filter((i, el) => jq(el).text().startsWith("Amount:"))
     .text()
     .replace("Amount: ", "")
@@ -113,7 +112,7 @@ const main = async (message) => {
     console.log("Couldn't find HTML in email. Can't parse.");
   }
 
-  console.log("Response", response);
+  console.log(response);
   if (response !== null) {
     return new Promise((resolve) => {
       twitter.post("statuses/update", { status: response }, (err, data) => {
